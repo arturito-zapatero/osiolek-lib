@@ -148,3 +148,43 @@ module "users_table" {
   ]
 }
 
+module "adresy_korespondencyjne_table" {
+  source     = "./modules/dynamo_db_tables"
+  table_name = "adresy_korespondencyjne"
+  hash_key   = "adres_id"
+
+  attributes = [
+    { name = "adres_id", type = "S" }
+  ]
+}
+
+module "personel_table" {
+  source     = "./modules/dynamo_db_tables"
+  table_name = "personel"
+  hash_key   = "personel_id"
+
+  attributes = [
+    { name = "personel_id", type = "S" }
+  ]
+}
+
+module "statusy_zamowien_table" {
+  source     = "./modules/dynamo_db_tables"
+  table_name = "statusy_zamowien"
+  hash_key   = "status_id"
+
+  attributes = [
+    { name = "status_id", type = "S" }
+  ]
+}
+
+module "zamowienia_table" {
+  source     = "./modules/dynamo_db_tables"
+  table_name = "zamowienia"
+  hash_key   = "zamowienie_id"
+
+  attributes = [
+    { name = "zamowienie_id", type = "S" }
+  ]
+}
+
