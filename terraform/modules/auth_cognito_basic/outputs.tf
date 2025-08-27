@@ -18,4 +18,6 @@ output "guest_username" {
   value = var.guest_username
 }
 
-# no guest_password output for safety
+# output "domain_url" {
+#   value = local.domain
+# }

@@ -7,8 +7,8 @@ locals {
       timeout      = 300
       architecture = "x86_64"
       environment = {
-        USERS_TABLE   = module.users_table.table_name  # for DynamoDB
-        USER_POOL_ID  = module.auth.user_pool_id       # Cognito User Pool ID
+        TABLE_NAME   = module.towary_table.table_name   # <-- was USERS_TABLE
+        USER_POOL_ID = module.auth.user_pool_id
       }
       attach_dynamodb_policy = true
       dynamodb_table_arn     = module.towary_table.table_arn
@@ -53,6 +53,38 @@ locals {
       ]
       vpc_subnet_ids = []
       vpc_security_group_ids = []
+    }
+
+    pre_signup_link = {
+      handler      = "main.lambda_handler"
+      runtime      = "python3.12"
+      memory_size  = 256
+      timeout      = 10
+      architecture = "x86_64"
+      environment = {
+        USER_POOL_ID = module.auth.user_pool_id
+      }
+      attach_dynamodb_policy = false
+      dynamodb_table_arn     = ""
+      layers                 = [aws_lambda_layer_version.common_deps.arn]
+      vpc_subnet_ids         = []
+      vpc_security_group_ids = []
+    }
+
+  post_confirmation_profile = {
+    handler      = "main.lambda_handler"
+    runtime      = "python3.12"
+    memory_size  = 256
+    timeout      = 10
+    architecture = "x86_64"
+    environment = {
+      USERS_TABLE = module.users_table.table_name
+    }
+    attach_dynamodb_policy = true
+    dynamodb_table_arn     = module.users_table.table_arn
+    layers                 = [aws_lambda_layer_version.common_deps.arn]
+    vpc_subnet_ids         = []
+    vpc_security_group_ids = []
     }
   }
 }

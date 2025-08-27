@@ -23,3 +23,18 @@ variable "guest_password" {
   sensitive = true
 }
 
+variable "enable_google" {
+  type    = bool
+  default = false
+}
+
+variable "google_client_id" {
+  type    = string
+  default = null
+}
+
+variable "google_client_secret" {
+  type      = string
+  default   = null
+  sensitive = true
+}
