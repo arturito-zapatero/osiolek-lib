@@ -1,0 +1,34 @@
+# Terraform
+*.tfstate
+*.tfstate.backup
+# Ignore the .terraform working directory (modules, providers, etc.)
+.terraform/
+# CLI-specific configuration
+.terraform.lock.hcl
+
+# Crash log files
+crash.log
+
+# Sensitive variable files (optional, only if you use them)
+*.tfvars
+*.tfvars.json
+
+# IDE and OS files (optional)
+.vscode/
+.idea/
+*.swp
+*.bak
+.DS_Store
+
+# Build artifacts
+*.zip
+
+terraform.tfstate
+terraform.tfstate.*
+__pycache__/
+.ipynb_checkpoints/
+.pytest_cache/
+.venv/
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfvars
