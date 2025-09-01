@@ -72,7 +72,8 @@ module "akt_stan_mag_table" {
 
   global_secondary_indexes = [
     { name = "ilosc_index", hash_key = "ILOSC", projection_type = "ALL" },
-    { name = "ilosc_zarezerwowana_index", hash_key = "ILOSC_ZAREZERWOWANA", projection_type = "ALL" }
+    { name = "ilosc_zarezerwowana_index", hash_key = "ILOSC_ZAREZERWOWANA", projection_type = "ALL" },
+    { name = "id_magazynu_index", hash_key = "ID_MAGAZYNU", projection_type = "ALL" }
   ]
 }
 
@@ -148,3 +149,16 @@ module "users_table" {
   ]
 }
 
+module "magazyny_table" {
+  source     = "./modules/dynamo_db_tables"
+  table_name = "magazyny"
+  hash_key   = "ID_MAGAZYNU"
+
+  # Only declare attributes used in keys / GSIs
+  attributes = [
+    { name = "ID_MAGAZYNU", type = "S" }
+  ]
+
+  # No GSIs needed right now
+  global_secondary_indexes = []
+}

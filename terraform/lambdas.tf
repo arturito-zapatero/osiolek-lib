@@ -71,20 +71,39 @@ locals {
       vpc_security_group_ids = []
     }
 
-  post_confirmation_profile = {
-    handler      = "main.lambda_handler"
-    runtime      = "python3.12"
-    memory_size  = 256
-    timeout      = 10
-    architecture = "x86_64"
-    environment = {
-      USERS_TABLE = module.users_table.table_name
+    post_confirmation_profile = {
+      handler      = "main.lambda_handler"
+      runtime      = "python3.12"
+      memory_size  = 256
+      timeout      = 10
+      architecture = "x86_64"
+      environment = {
+        USERS_TABLE = module.users_table.table_name
+      }
+      attach_dynamodb_policy = true
+      dynamodb_table_arn     = module.users_table.table_arn
+      layers                 = [aws_lambda_layer_version.common_deps.arn]
+      vpc_subnet_ids         = []
+      vpc_security_group_ids = []
     }
-    attach_dynamodb_policy = true
-    dynamodb_table_arn     = module.users_table.table_arn
-    layers                 = [aws_lambda_layer_version.common_deps.arn]
-    vpc_subnet_ids         = []
-    vpc_security_group_ids = []
+
+    get_times = {
+      handler      = "main.lambda_handler"
+      runtime      = "python3.12"
+      memory_size  = 512
+      timeout      = 300
+      architecture = "x86_64"
+      environment = {
+        WAREHOUSE_TABLE    = module.magazyny_table.table_name
+        AKT_STAN_MAG_TABLE = module.akt_stan_mag_table.table_name
+        AKT_STAN_MAG_GSI   = "id_magazynu_index"
+      }
+      # built-in single-table policy isn't enough; we need 2 tables + index
+      attach_dynamodb_policy = false
+      dynamodb_table_arn     = ""
+      layers                 = [aws_lambda_layer_version.common_deps.arn]
+      vpc_subnet_ids         = []
+      vpc_security_group_ids = []
     }
   }
 }
@@ -157,4 +176,27 @@ module "lambdas" {
   tags                    = local.tags
   region       = var.aws_region
   user_pool_id = module.auth.user_pool_id
+}
+
+# IAM for get_times: scan magazyny, query akt_stan_mag + its GSI
+resource "aws_iam_role_policy" "get_times_dynamodb" {
+  role = module.lambdas["get_times"].role_name
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["dynamodb:Scan"],
+        Resource = module.magazyny_table.table_arn
+      },
+      {
+        Effect = "Allow",
+        Action = ["dynamodb:Query"],
+        Resource = [
+          module.akt_stan_mag_table.table_arn,
+          "${module.akt_stan_mag_table.table_arn}/index/id_magazynu_index"
+        ]
+      }
+    ]
+  })
 }

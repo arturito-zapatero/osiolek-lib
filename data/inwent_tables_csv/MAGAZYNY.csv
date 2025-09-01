@@ -1,0 +1,4 @@
+ID_MAGAZYNU,NAZWA,LAT_MAGAZYNU,LON_MAGAZYNU,AKTYWNY,MIASTO,REGION
+M1S,magazyn Kragi,53.71,16.70,true,Kragi,Zachodniopomorskie
+M1P,magazyn Poznan,52.40,16.93,true,Poznan,Wilekopolska
+M1S,magazyn Gniezno,52.53,17.58,true,Gniezno,Wielkopolska
