@@ -1,14 +1,22 @@
-# lambda-functions/get_items/main.py
 import os
 from decimal import Decimal
 import unicodedata
 from rapidfuzz import process, fuzz
 import boto3, json
 from datetime import datetime
+from boto3.dynamodb.conditions import Key, Attr
 from models.models import GetItemsQueryModel  # <- Pydantic model
 
 dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table(os.environ["TABLE_NAME"])
+
+# Items/catalog table (same as before)
+ITEMS_TABLE = os.environ["TABLE_NAME"]
+items_tbl = dynamodb.Table(ITEMS_TABLE)
+
+# Warehouse stock table + GSI (NEW)
+AKT_STAN_MAG_TABLE = os.environ.get("AKT_STAN_MAG_TABLE", "akt_stan_mag")
+AKT_STAN_MAG_GSI   = os.environ.get("AKT_STAN_MAG_GSI", "id_magazynu_index")
+stock_tbl = dynamodb.Table(AKT_STAN_MAG_TABLE)
 
 PROJECTION = "ID_TOWARU, NAZWA_TOWARU, DATA_UTWORZENIA"
 MAX_SCAN_PAGES = int(os.environ.get("SCAN_PAGE_LIMIT", "3"))
@@ -34,11 +42,42 @@ def _parse_iso(dt: str):
     except Exception:
         return None
 
+def _get_allowed_ids_for_warehouse(warehouse_id: str, limit: int = 5000) -> set:
+    """Query akt_stan_mag GSI for items available in given warehouse."""
+    kwargs = {
+        "IndexName": AKT_STAN_MAG_GSI,
+        "KeyConditionExpression": Key("ID_MAGAZYNU").eq(warehouse_id),
+        "FilterExpression": Attr("ILOSC").gt(0),  # only in-stock
+        "ProjectionExpression": "ID_TOWARU, ILOSC",
+        "Limit": min(limit, 1000)  # page size
+    }
+    allowed = set()
+    resp = stock_tbl.query(**kwargs)
+    for it in resp.get("Items", []):
+        if "ID_TOWARU" in it:
+            allowed.add(it["ID_TOWARU"])
+    while "LastEvaluatedKey" in resp and len(allowed) < limit:
+        resp = stock_tbl.query(**kwargs, ExclusiveStartKey=resp["LastEvaluatedKey"])
+        for it in resp.get("Items", []):
+            if "ID_TOWARU" in it:
+                allowed.add(it["ID_TOWARU"])
+    return allowed
+
 def lambda_handler(event, context):
     try:
         qs = (event or {}).get("queryStringParameters") or {}
+        headers = (event or {}).get("headers") or {}
 
-        # Validate query params via Pydantic
+        # NEW: warehouse_id is required (query or header)
+        warehouse_id = qs.get("warehouse_id") or headers.get("X-Warehouse-Id")
+        if not warehouse_id:
+            return {
+                "statusCode": 400,
+                "headers": {"Content-Type": "application/json"},
+                "body": json.dumps({"error": "Missing 'warehouse_id'."}),
+            }
+
+        # Validate query params via Pydantic (still validates: query, cutoff, limit)
         try:
             query_model = GetItemsQueryModel(**qs)
         except Exception as ve:
@@ -58,14 +97,31 @@ def lambda_handler(event, context):
                 "body": json.dumps({"error": "Missing 'query' parameter."}),
             }
 
-        # Scan DynamoDB
+        # 1) Get the set of allowed item IDs for this warehouse
+        allowed_ids = _get_allowed_ids_for_warehouse(warehouse_id)
+        if not allowed_ids:
+            # No stock in this warehouse — return empty result quickly
+            return {
+                "statusCode": 200,
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                },
+                "body": json.dumps({"results": [], "next_cursor": None}),
+            }
+
+        # 2) Scan items table, but keep only allowed IDs (fast set check)
         items = []
         scan_kwargs = {"ProjectionExpression": PROJECTION}
         pages = 0
         while True:
-            resp = table.scan(**scan_kwargs)
+            resp = items_tbl.scan(**scan_kwargs)
             batch = resp.get("Items", [])
-            items.extend(batch)
+
+            # keep only items from this warehouse's stock
+            for it in batch:
+                if it.get("ID_TOWARU") in allowed_ids:
+                    items.append(it)
 
             pages += 1
             if len(items) >= MAX_SCAN_ITEMS or pages >= MAX_SCAN_PAGES:
@@ -76,7 +132,7 @@ def lambda_handler(event, context):
                 break
             scan_kwargs["ExclusiveStartKey"] = lek
 
-        # Build lookup by normalized name
+        # 3) Build lookup by normalized name from filtered items
         name_to_items = {}
         for it in items:
             name_norm = _strip_accents((it.get("NAZWA_TOWARU") or "").strip())
@@ -86,7 +142,7 @@ def lambda_handler(event, context):
 
         term_norm = _strip_accents(term)
 
-        # Fuzzy match
+        # 4) Fuzzy match on the reduced candidate set
         matches = process.extract(
             term_norm,
             list(name_to_items.keys()),
@@ -95,7 +151,7 @@ def lambda_handler(event, context):
             limit=limit,
         ) if name_to_items else []
 
-        # Latest item per ID_TOWARU
+        # 5) For each matched name, pick latest by DATA_UTWORZENIA per ID_TOWARU
         latest_by_id = {}
         for match_name, score, _ in matches:
             for it in name_to_items.get(match_name, []):
@@ -105,7 +161,7 @@ def lambda_handler(event, context):
                 if id_towaru and (cur is None or _parse_iso(cur.get("DATA_UTWORZENIA", "")) < dt):
                     latest_by_id[id_towaru] = it
 
-        # Format results
+        # 6) Format results (unique by ID_TOWARU)
         seen = set()
         results = []
         for match_name, _, _ in matches:
@@ -120,7 +176,7 @@ def lambda_handler(event, context):
                     seen.add(id_t)
 
         partial = pages >= MAX_SCAN_PAGES or len(items) >= MAX_SCAN_ITEMS
-        next_cursor = resp.get("LastEvaluatedKey") if partial else None
+        next_cursor = None  # scan cursor doesn’t map cleanly once we filter; omit
 
         return {
             "statusCode": 200,

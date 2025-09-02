@@ -19,6 +19,16 @@ resource "aws_lambda_permission" "allow_httpapi_get_times" {
   source_arn    = "${module.api_http.execution_arn}/*/*"
   depends_on    = [module.api_http]
 }
+# allow invoke
+resource "aws_lambda_permission" "allow_httpapi_get_warehouses" {
+  statement_id  = "AllowInvokeFromHttpApiGetWarehouses"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambdas["get_warehouses"].lambda_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${module.api_http.execution_arn}/*/*"
+  depends_on    = [module.api_http]
+}
+
 
 module "api_http" {
   source     = "./modules/http_api"
@@ -76,6 +86,24 @@ module "api_http" {
         lambda_arn  = module.lambdas["get_times"].lambda_arn
         lambda_name = module.lambdas["get_times"].lambda_name
       }
+
+      warehouses_nearby_public = {
+        method      = "GET"
+        path        = "/warehouses/nearby"
+        auth_type   = "NONE"
+        scopes      = []
+        lambda_arn  = module.lambdas["get_warehouses"].lambda_arn
+        lambda_name = module.lambdas["get_warehouses"].lambda_name
+      }
+      warehouses_nearby_auth = {
+        method      = "GET"
+        path        = "/auth/warehouses/nearby"
+        auth_type   = "JWT"
+        scopes      = []
+        lambda_arn  = module.lambdas["get_warehouses"].lambda_arn
+        lambda_name = module.lambdas["get_warehouses"].lambda_name
+      }
+
     }
   )
 

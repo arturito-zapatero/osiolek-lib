@@ -7,10 +7,13 @@ locals {
       timeout      = 300
       architecture = "x86_64"
       environment = {
-        TABLE_NAME   = module.towary_table.table_name   # <-- was USERS_TABLE
+        TABLE_NAME   = module.towary_table.table_name
         USER_POOL_ID = module.auth.user_pool_id
+        AKT_STAN_MAG_TABLE  = module.akt_stan_mag_table.table_name   # NEW
+        AKT_STAN_MAG_GSI    = "id_magazynu_index"                    # NEW
       }
-      attach_dynamodb_policy = true
+      # attach_dynamodb_policy = true
+      attach_dynamodb_policy = false  # we'll attach explicit policy for 2 resources
       dynamodb_table_arn     = module.towary_table.table_arn
       layers = [
         #"arn:aws:lambda:eu-central-1:389251923599:layer:common_deps:1"
@@ -82,6 +85,23 @@ locals {
       }
       attach_dynamodb_policy = true
       dynamodb_table_arn     = module.users_table.table_arn
+      layers                 = [aws_lambda_layer_version.common_deps.arn]
+      vpc_subnet_ids         = []
+      vpc_security_group_ids = []
+    }
+
+    get_warehouses = {
+      handler      = "main.lambda_handler"
+      runtime      = "python3.12"
+      memory_size  = 256
+      timeout      = 20
+      architecture = "x86_64"
+      environment = {
+        WAREHOUSE_TABLE = module.magazyny_table.table_name
+        NEARBY_LIMIT    = 3
+      }
+      attach_dynamodb_policy = false
+      dynamodb_table_arn     = ""
       layers                 = [aws_lambda_layer_version.common_deps.arn]
       vpc_subnet_ids         = []
       vpc_security_group_ids = []
@@ -190,6 +210,44 @@ resource "aws_iam_role_policy" "get_times_dynamodb" {
         Resource = module.magazyny_table.table_arn
       },
       {
+        Effect = "Allow",
+        Action = ["dynamodb:Query"],
+        Resource = [
+          module.akt_stan_mag_table.table_arn,
+          "${module.akt_stan_mag_table.table_arn}/index/id_magazynu_index"
+        ]
+      }
+    ]
+  })
+}
+
+# IAM policy attach (uses role_name output from your module)
+resource "aws_iam_role_policy" "get_warehouses_scan" {
+  role = module.lambdas["get_warehouses"].role_name
+  policy = jsonencode({
+    Version="2012-10-17",
+    Statement=[{
+      Effect="Allow",
+      Action=["dynamodb:Scan"],
+      Resource=module.magazyny_table.table_arn
+    }]
+  })
+}
+
+# IAM for get_items: scan items table, query akt_stan_mag + its GSI
+resource "aws_iam_role_policy" "get_items_dynamodb" {
+  role = module.lambdas["get_items"].role_name
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid    = "ScanItemsCatalog",
+        Effect = "Allow",
+        Action = ["dynamodb:Scan"],
+        Resource = module.towary_table.table_arn
+      },
+      {
+        Sid    = "QueryWarehouseStock",
         Effect = "Allow",
         Action = ["dynamodb:Query"],
         Resource = [
