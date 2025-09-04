@@ -8,17 +8,17 @@ class UserCreateModel(BaseModel):
     first_name: str
     surname: str
     auth_type: str  # "manual" or "cognito"
-    address: Optional[str]
-    phone: Optional[str]
+    address: Optional[str] = None   # <- default makes it optional
+    phone: Optional[str] = None     # <- default makes it optional
 
 
 
 class UserUpdateModel(BaseModel):
     user_id: str
-    first_name: Optional[str]
-    surname: Optional[str]
-    address: Optional[str]
-    phone: Optional[str]
+    first_name: Optional[str] = None
+    surname: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
 
 
 class GetItemsQueryModel(BaseModel):

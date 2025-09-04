@@ -48,7 +48,10 @@ locals {
       memory_size  = 512
       timeout      = 300
       architecture = "x86_64"
-      environment = { TABLE_NAME = module.users_table.table_name }
+      environment = {
+        USERS_TABLE   = module.users_table.table_name  # for DynamoDB
+        USER_POOL_ID  = module.auth.user_pool_id       # Cognito User Pool ID
+      }
       attach_dynamodb_policy = true
       dynamodb_table_arn     = module.users_table.table_arn
       layers = [

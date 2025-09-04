@@ -28,7 +28,23 @@ resource "aws_lambda_permission" "allow_httpapi_get_warehouses" {
   source_arn    = "${module.api_http.execution_arn}/*/*"
   depends_on    = [module.api_http]
 }
+resource "aws_lambda_permission" "allow_httpapi_create_user" {
+  statement_id  = "AllowInvokeFromHttpApiCreateUser"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambdas["create_user"].lambda_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${module.api_http.execution_arn}/*/*"
+  depends_on    = [module.api_http]
+}
 
+resource "aws_lambda_permission" "allow_httpapi_update_user" {
+  statement_id  = "AllowInvokeFromHttpApiUpdateUser"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambdas["update_user"].lambda_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${module.api_http.execution_arn}/*/*"
+  depends_on    = [module.api_http]
+}
 
 module "api_http" {
   source     = "./modules/http_api"
@@ -102,6 +118,22 @@ module "api_http" {
         scopes      = []
         lambda_arn  = module.lambdas["get_warehouses"].lambda_arn
         lambda_name = module.lambdas["get_warehouses"].lambda_name
+      }
+      create_user_public = {
+        method      = "POST"
+        path        = "/users"
+        auth_type   = "NONE"   # or "JWT" if you want only admins to call it
+        scopes      = []
+        lambda_arn  = module.lambdas["create_user"].lambda_arn
+        lambda_name = module.lambdas["create_user"].lambda_name
+      }
+      update_user = {
+        method      = "PUT"
+        path        = "/users/{user_id}"   # path param
+        auth_type   = "JWT"                # protect with Cognito
+        scopes      = []
+        lambda_arn  = module.lambdas["update_user"].lambda_arn
+        lambda_name = module.lambdas["update_user"].lambda_name
       }
 
     }
