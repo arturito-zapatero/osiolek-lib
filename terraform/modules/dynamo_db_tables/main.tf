@@ -22,4 +22,9 @@ resource "aws_dynamodb_table" "this" {
         range_key = contains(keys(global_secondary_index.value), "range_key") ? global_secondary_index.value.range_key : null
       }
   }
+
+  ttl {
+    attribute_name = "TTL"
+    enabled        = true
+  }
 }

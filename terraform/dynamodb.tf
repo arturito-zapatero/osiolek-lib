@@ -162,3 +162,29 @@ module "magazyny_table" {
   # No GSIs needed right now
   global_secondary_indexes = []
 }
+
+# Shopping cart table: one partition per cart (CART_ID), multiple items by ITEM_KEY
+module "koszyk_table" {
+  source     = "./modules/dynamo_db_tables"
+  table_name = "koszyk"
+  hash_key   = "CART_ID"
+  range_key  = "ITEM_KEY"
+
+  # ✅ ONLY key attributes + GSI keys here
+  attributes = [
+    { name = "CART_ID",  type = "S" },
+    { name = "ITEM_KEY", type = "S" },
+    { name = "USER_ID",  type = "S" } # because it's the GSI hash key
+  ]
+
+  global_secondary_indexes = [
+    { name = "user_index", hash_key = "USER_ID", projection_type = "ALL" }
+  ]
+
+  # If your module supports passing TTL, use its inputs; otherwise add ttl in the module’s aws_dynamodb_table
+  # Example expected inside the module's aws_dynamodb_table "this":
+  # ttl {
+  #   attribute_name = "TTL"
+  #   enabled        = true
+  # }
+}

@@ -128,6 +128,90 @@ locals {
       vpc_subnet_ids         = []
       vpc_security_group_ids = []
     }
+
+    # --- CART Lambdas ---
+    cart_create_or_get = {
+      handler      = "main.lambda_handler"
+      runtime      = "python3.12"
+      memory_size  = 256
+      timeout      = 15
+      architecture = "x86_64"
+      environment = {
+        KOSZYK_TABLE       = module.koszyk_table.table_name
+        CART_TTL_DAYS      = 7
+      }
+      attach_dynamodb_policy = false
+      dynamodb_table_arn     = ""
+      layers                 = [aws_lambda_layer_version.common_deps.arn]
+      vpc_subnet_ids         = []
+      vpc_security_group_ids = []
+    }
+
+    cart_get = {
+      handler      = "main.lambda_handler"
+      runtime      = "python3.12"
+      memory_size  = 256
+      timeout      = 10
+      architecture = "x86_64"
+      environment = {
+        KOSZYK_TABLE = module.koszyk_table.table_name
+      }
+      attach_dynamodb_policy = false
+      dynamodb_table_arn     = ""
+      layers                 = [aws_lambda_layer_version.common_deps.arn]
+      vpc_subnet_ids         = []
+      vpc_security_group_ids = []
+    }
+
+    cart_add_item = {
+      handler      = "main.lambda_handler"
+      runtime      = "python3.12"
+      memory_size  = 256
+      timeout      = 20
+      architecture = "x86_64"
+      environment = {
+        KOSZYK_TABLE       = module.koszyk_table.table_name
+        AKT_STAN_MAG_TABLE = module.akt_stan_mag_table.table_name
+        CART_TTL_DAYS      = 7
+      }
+      attach_dynamodb_policy = false
+      dynamodb_table_arn     = ""
+      layers                 = [aws_lambda_layer_version.common_deps.arn]
+      vpc_subnet_ids         = []
+      vpc_security_group_ids = []
+    }
+
+    cart_update_item = {
+      handler      = "main.lambda_handler"
+      runtime      = "python3.12"
+      memory_size  = 256
+      timeout      = 10
+      architecture = "x86_64"
+      environment = {
+        KOSZYK_TABLE = module.koszyk_table.table_name
+      }
+      attach_dynamodb_policy = false
+      dynamodb_table_arn     = ""
+      layers                 = [aws_lambda_layer_version.common_deps.arn]
+      vpc_subnet_ids         = []
+      vpc_security_group_ids = []
+    }
+
+    cart_clear = {
+      handler      = "main.lambda_handler"
+      runtime      = "python3.12"
+      memory_size  = 256
+      timeout      = 20
+      architecture = "x86_64"
+      environment = {
+        KOSZYK_TABLE = module.koszyk_table.table_name
+      }
+      attach_dynamodb_policy = false
+      dynamodb_table_arn     = ""
+      layers                 = [aws_lambda_layer_version.common_deps.arn]
+      vpc_subnet_ids         = []
+      vpc_security_group_ids = []
+    }
   }
 }
 
@@ -259,5 +343,77 @@ resource "aws_iam_role_policy" "get_items_dynamodb" {
         ]
       }
     ]
+  })
+}
+
+# cart_create_or_get: koszyk R/W
+resource "aws_iam_role_policy" "cart_create_or_get_dynamo" {
+  role = module.lambdas["cart_create_or_get"].role_name
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect   = "Allow",
+      Action   = ["dynamodb:PutItem","dynamodb:GetItem","dynamodb:UpdateItem","dynamodb:Query","dynamodb:BatchWriteItem"],
+      Resource = module.koszyk_table.table_arn
+    }]
+  })
+}
+
+# cart_get: koszyk query
+resource "aws_iam_role_policy" "cart_get_dynamo" {
+  role = module.lambdas["cart_get"].role_name
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect   = "Allow",
+      Action   = ["dynamodb:GetItem","dynamodb:Query"],
+      Resource = module.koszyk_table.table_arn
+    }]
+  })
+}
+
+# cart_add_item: koszyk R/W + akt_stan_mag GetItem (stock check)
+resource "aws_iam_role_policy" "cart_add_item_dynamo" {
+  role = module.lambdas["cart_add_item"].role_name
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = ["dynamodb:PutItem","dynamodb:GetItem","dynamodb:UpdateItem","dynamodb:Query","dynamodb:BatchWriteItem"],
+        Resource = module.koszyk_table.table_arn
+      },
+      {
+        Effect   = "Allow",
+        Action   = ["dynamodb:GetItem"],
+        Resource = module.akt_stan_mag_table.table_arn
+      }
+    ]
+  })
+}
+
+# cart_update_item: koszyk Update/Delete/Get
+resource "aws_iam_role_policy" "cart_update_item_dynamo" {
+  role = module.lambdas["cart_update_item"].role_name
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect   = "Allow",
+      Action   = ["dynamodb:UpdateItem","dynamodb:DeleteItem","dynamodb:GetItem"],
+      Resource = module.koszyk_table.table_arn
+    }]
+  })
+}
+
+# cart_clear: koszyk Query + BatchWrite
+resource "aws_iam_role_policy" "cart_clear_dynamo" {
+  role = module.lambdas["cart_clear"].role_name
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Effect   = "Allow",
+      Action   = ["dynamodb:Query","dynamodb:BatchWriteItem","dynamodb:DeleteItem"],
+      Resource = module.koszyk_table.table_arn
+    }]
   })
 }

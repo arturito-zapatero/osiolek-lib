@@ -46,6 +46,52 @@ resource "aws_lambda_permission" "allow_httpapi_update_user" {
   depends_on    = [module.api_http]
 }
 
+resource "aws_lambda_permission" "allow_httpapi_cart_create_or_get" {
+  statement_id  = "AllowInvokeFromHttpApiCartCreateOrGet"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambdas["cart_create_or_get"].lambda_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${module.api_http.execution_arn}/*/*"
+  depends_on    = [module.api_http]
+}
+
+resource "aws_lambda_permission" "allow_httpapi_cart_get" {
+  statement_id  = "AllowInvokeFromHttpApiCartGet"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambdas["cart_get"].lambda_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${module.api_http.execution_arn}/*/*"
+  depends_on    = [module.api_http]
+}
+
+resource "aws_lambda_permission" "allow_httpapi_cart_add_item" {
+  statement_id  = "AllowInvokeFromHttpApiCartAddItem"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambdas["cart_add_item"].lambda_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${module.api_http.execution_arn}/*/*"
+  depends_on    = [module.api_http]
+}
+
+resource "aws_lambda_permission" "allow_httpapi_cart_update_item" {
+  statement_id  = "AllowInvokeFromHttpApiCartUpdateItem"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambdas["cart_update_item"].lambda_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${module.api_http.execution_arn}/*/*"
+  depends_on    = [module.api_http]
+}
+
+resource "aws_lambda_permission" "allow_httpapi_cart_clear" {
+  statement_id  = "AllowInvokeFromHttpApiCartClear"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambdas["cart_clear"].lambda_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${module.api_http.execution_arn}/*/*"
+  depends_on    = [module.api_http]
+}
+
+
 module "api_http" {
   source     = "./modules/http_api"
   api_name   = local.api_name
@@ -135,6 +181,49 @@ module "api_http" {
         lambda_arn  = module.lambdas["update_user"].lambda_arn
         lambda_name = module.lambdas["update_user"].lambda_name
       }
+
+    # CART (JWT-protected preferred; flip to NONE if you want it public for guests now)
+    cart_create_or_get = {
+      method      = "POST"
+      path        = "/cart"
+      auth_type   = "JWT"   # use NONE if guest support now; JWT if logged only
+      scopes      = []
+      lambda_arn  = module.lambdas["cart_create_or_get"].lambda_arn
+      lambda_name = module.lambdas["cart_create_or_get"].lambda_name
+    }
+    cart_get = {
+      method      = "GET"
+      path        = "/cart"
+      auth_type   = "JWT"
+      scopes      = []
+      lambda_arn  = module.lambdas["cart_get"].lambda_arn
+      lambda_name = module.lambdas["cart_get"].lambda_name
+    }
+    cart_add_item = {
+      method      = "POST"
+      path        = "/cart/items"
+      auth_type   = "JWT"
+      scopes      = []
+      lambda_arn  = module.lambdas["cart_add_item"].lambda_arn
+      lambda_name = module.lambdas["cart_add_item"].lambda_name
+    }
+    cart_update_item = {
+      method      = "PUT"
+      path        = "/cart/items/{item_id}"
+      auth_type   = "JWT"
+      scopes      = []
+      lambda_arn  = module.lambdas["cart_update_item"].lambda_arn
+      lambda_name = module.lambdas["cart_update_item"].lambda_name
+    }
+    cart_clear = {
+      method      = "DELETE"
+      path        = "/cart"
+      auth_type   = "JWT"
+      scopes      = []
+      lambda_arn  = module.lambdas["cart_clear"].lambda_arn
+      lambda_name = module.lambdas["cart_clear"].lambda_name
+    }
+
 
     }
   )
